@@ -23,7 +23,11 @@ Send a POST request:
 """
 import argparse
 import json
+import sys
+
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+
 
 """
 What is a Note:
@@ -35,7 +39,8 @@ What is a Note:
 
 """
 
-class S(BaseHTTPRequestHandler):
+
+class NoteTaking:
     def load_notes(self):
         with open('notes.json') as file_handle:
             return json.load(file_handle)
@@ -45,16 +50,19 @@ class S(BaseHTTPRequestHandler):
             file_handle.write(json.dumps(notes, indent=2))
             file_handle.write('\n')
 
+    def list_all_notes(self):
+        notes = self.load_notes()
+        for note in notes:
+            print(note)
+
+
+class S(BaseHTTPRequestHandler, NoteTaking):
     def _set_headers(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
 
     def _html(self, message):
-        """This just generates an HTML document that includes `message`
-        in the body. Override, or re-write this do do more interesting stuff.
-
-        """
         content = f"<html><body>{message}</body></html>"
         return content.encode("utf8")  # NOTE: must return a bytes object!
 
@@ -65,15 +73,11 @@ class S(BaseHTTPRequestHandler):
         js_script = """
         <script>
           function submit_new_entry() {
-            text = document.getElementById("new_text");
-            console.log(text);
+            form = document.getElementById("new_entry")
+            console.log(form);
+            form.submit();
           }
-          
-          function myFunction() {
-              document.getElementById("myForm").submit();
-            }
         </script>
-        
         """
 
         response = js_script + """<table><tr>
@@ -91,23 +95,15 @@ class S(BaseHTTPRequestHandler):
 
         # new button
         response += f"""
+        <form id="new_entry" action="/new_entry">
           <tr>
             <td><button type="button" onclick="submit_new_entry()">New</button></td>
             <td>
                 <input type="text" id="new_text" name="new_text"><br><br>
             </td>
           </tr>
-        """
-
-        response += """
-                <form id="myForm" action="/action_page.php">
-          First name: <input type="text" name="fname"><br>
-          Last name: <input type="text" name="lname"><br><br>
-          <input type="button" onclick="myFunction()" value="Submit form">
         </form>
-        
         """
-
         self.wfile.write(self._html(response))
 
     def do_HEAD(self):
@@ -129,7 +125,7 @@ def run(server_class=HTTPServer, handler_class=S, addr="localhost", port=8000):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Run a simple HTTP server")
+    parser = argparse.ArgumentParser(description="A notetaking server/client")
     parser.add_argument(
         "-l",
         "--listen",
@@ -143,5 +139,18 @@ if __name__ == "__main__":
         default=8000,
         help="Specify the port on which the server listens",
     )
+    parser.add_argument(
+        "-c",
+        "--client",
+        action="store_const",
+        dest='client',
+        default=False,
+        const=True,
+        help="Use as a commandline client",
+    )
     args = parser.parse_args()
-    run(addr=args.listen, port=args.port)
+
+    if args.client:
+        CLI_Client().run_as_cli()
+    else:
+        run(addr=args.listen, port=args.port)
